@@ -55,7 +55,7 @@ struct WelcomeView: View {
     let onDone: () -> Void
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "circle.hexagongrid.circle.fill").font(.system(size: 56)).foregroundStyle(.orange)
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 96, height: 96)
             Text("Welcome to Clementine").font(.title).bold()
             VStack(alignment: .leading, spacing: 12) {
                 Label("Step 1. Drag files in Finder.", systemImage: "hand.draw")
