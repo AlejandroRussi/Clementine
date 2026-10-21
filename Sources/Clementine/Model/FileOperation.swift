@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// Broad category of a dropped file, used to decide which actions apply.
 enum FileKind: Hashable {
-    case image, video, audio, pdf, document, archive, folder, other
+    case image, video, audio, pdf, document, presentation, archive, folder, other
 
     static func of(_ url: URL) -> FileKind {
         var isDir: ObjCBool = false
@@ -12,6 +12,7 @@ enum FileKind: Hashable {
             return .folder
         }
         let ext = url.pathExtension.lowercased()
+        if ["pptx", "ppt", "key"].contains(ext) { return .presentation }
         if ["md", "markdown", "docx", "doc", "rtf", "rtfd", "txt", "html", "htm", "odt", "webarchive"].contains(ext) {
             return .document
         }
@@ -34,7 +35,7 @@ enum OutputFormat: String, CaseIterable, Hashable {
     // Images
     case jpg, png, heic, webp, tiff, gif, bmp
     // Documents
-    case pdf, docx, rtf, txt, html
+    case pdf, docx, rtf, txt, html, pptx
     // Video
     case mp4, mov
     // Audio
@@ -47,6 +48,7 @@ enum OutputFormat: String, CaseIterable, Hashable {
         case .jpg, .png, .heic, .webp, .tiff, .gif, .bmp: return .image
         case .pdf: return .pdf
         case .docx, .rtf, .txt, .html: return .document
+        case .pptx: return .presentation
         case .mp4, .mov: return .video
         case .m4a, .mp3, .wav, .aiff, .flac: return .audio
         }
@@ -179,7 +181,8 @@ enum OperationCatalog {
         case .document: return [.pdf, .docx, .rtf, .txt, .html]
         case .video: return [.mp4, .mov, .m4a] + (ffmpeg ? [.mp3] : [])
         case .audio: return [.m4a, .wav, .aiff] + (ffmpeg ? [.mp3, .flac] : [])
-        case .pdf: return [.png, .jpg, .txt]
+        case .pdf: return [.png, .jpg, .txt, .pptx]
+        case .presentation: return [.pdf]
         default: return []
         }
     }

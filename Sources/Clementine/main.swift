@@ -6,7 +6,9 @@ if let i = CommandLine.arguments.firstIndex(of: "--cli") {
         let code = await CLI.run(args)
         exit(code)
     }
-    dispatchMain()
+    // Keep the real main thread serving the main queue (WebKit must start on it);
+    // dispatchMain() would park it and drain main-queue work on a worker thread.
+    while true { RunLoop.main.run() }
 }
 
 MainActor.assumeIsolated {

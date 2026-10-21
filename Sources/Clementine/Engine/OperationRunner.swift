@@ -55,7 +55,9 @@ final class OperationRunner {
             case .image: return [try ImageTools.convert(url, to: format, stripMetadata: !keepMetadata)]
             case .document: return [try DocumentTools.convert(url, to: format)]
             case .video, .audio: return [try await MediaTools.convert(url, to: format)]
+            case .presentation where format == .pdf: return [try await PresentationTools.pptxToPDF(url)]
             case .pdf:
+                if format == .pptx { return [try PresentationTools.pdfToPPTX(url)] }
                 if format == .txt {
                     let dest = Output.beside(url, ext: "txt")
                     try PDFTools.text(url).write(to: dest, atomically: true, encoding: .utf8)

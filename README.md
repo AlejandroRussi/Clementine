@@ -32,7 +32,7 @@ Headless mode, for scripting or tests:
 .build/debug/Clementine --cli compress clip.mov
 ```
 
-Operations: `convert:<fmt>`, `compress`, `strip`, `resize:<px>`, `ocr`, `qr`,
+Operations: `convert:<fmt>` (incl. `convert:pptx` for PDFs and `convert:pdf` for .pptx/.ppt/.key), `compress`, `strip`, `resize:<px>`, `ocr`, `qr`,
 `combine`, `split`, `pdf2png`, `gif`, `audio`, `mute`, `zip`, `extract`.
 
 Timeline edits: `trim:<start>-<end>`, `cut:<t1>,<t2>[:joined:<removed clip idx>,…]`,
@@ -62,7 +62,8 @@ share of each) and **Collage**.
 | Audio bleep, waveform visualizer video, channel/normalized audio preview | ❌ |
 | PDF combine / split / organize / to images / compress | ✅ except visual page organizer |
 | Documents ↔ PDF/DOCX/RTF/TXT/HTML, Markdown | ✅ via NSAttributedString |
-| EPUB, Pages (`PagesWriter.js`), PowerPoint (bundled Java + Apache POI), spreadsheets | ❌ |
+| PowerPoint ⇄ PDF (Tangerine bundles Java + Apache POI) | ✅ natively: PPTX → PDF via Quick Look's Office renderer + WebKit (Keynote fallback); PDF → PPTX as one page image per slide with searchable text behind it |
+| EPUB, Pages (`PagesWriter.js`), spreadsheets | ❌ |
 | Metadata removal / editor (bundled ExifTool) | ✅ removal via ImageIO/AVFoundation/PDFKit; ❌ field editor |
 | OCR text, QR reading (Vision) | ✅ |
 | Annotate (arrow, draw, highlight, box, text, magnifier), redact (blur / pixelate / solid, face & text detection), crop (incl. same crop for every image) | ✅ |
