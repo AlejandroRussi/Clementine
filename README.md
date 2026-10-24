@@ -49,6 +49,17 @@ editor window with a scrubbable timeline (Space plays, B splits, Delete removes 
 A single image gets **Annotate / Redact / Crop / Background**; several images get **Crop** (same
 share of each) and **Collage**.
 
+A single PDF gets **Pick Pages**: click pages in a thumbnail grid (⇧-click for a run) or type
+ranges like `1-3, 5, 8-`, then save them as one PDF, a PDF per page, or PNG/JPEG images.
+From the CLI: `pages:<1-3,5,8->[:pdf|pdfs|png|jpg]`.
+
+**Shred** (every file type, also in Float's menu) removes files immediately and shows an undo
+banner for 30 seconds. Press ⌘Z, click Undo, or choose **Undo Shred** from the menu bar to put
+them back. After that, each file is overwritten once with random data, flushed to disk and
+deleted. Quitting Clementine erases anything still waiting. On SSDs and APFS, overwriting can't
+guarantee old blocks are gone (copy-on-write, snapshots, wear leveling), so FileVault is what
+really protects deleted data. The CLI `shred` erases right away, with no undo.
+
 ## What Tangerine does (observed) vs. what Clementine implements
 
 | Tangerine feature (evidence: type names / UI strings) | Clementine |

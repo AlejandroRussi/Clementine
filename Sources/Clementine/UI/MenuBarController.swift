@@ -2,7 +2,7 @@ import AppKit
 
 /// Status item with a menu, which also accepts file drops to open the wheel.
 @MainActor
-final class MenuBarController: NSObject {
+final class MenuBarController: NSObject, NSMenuItemValidation {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
     override init() {
@@ -21,6 +21,7 @@ final class MenuBarController: NSObject {
         let menu = NSMenu()
         menu.addItem(withTitle: "Choose Files…", action: #selector(chooseFiles), keyEquivalent: "o").target = self
         menu.addItem(withTitle: "Create a New Float", action: #selector(newFloat), keyEquivalent: "f").target = self
+        menu.addItem(withTitle: "Undo Shred", action: #selector(undoShred), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Getting Started", action: #selector(welcome), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Settings…", action: #selector(settings), keyEquivalent: ",").target = self
@@ -40,8 +41,13 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func newFloat() { FloatController.shared.show() }
+    @objc private func undoShred() { Shredder.shared.undo() }
     @objc private func welcome() { Windows.showWelcome() }
     @objc private func settings() { Windows.showSettings() }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action == #selector(undoShred) ? Shredder.shared.canUndo : true
+    }
 }
 
 /// Transparent overlay on the status button that receives dragged files

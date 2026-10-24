@@ -35,12 +35,20 @@ enum PDFTools {
         return dest
     }
 
-    static func split(_ url: URL) throws -> [URL] {
+    /// One PDF per page (all by default), in a folder beside the original.
+    static func split(_ url: URL, pages: [Int]? = nil) throws -> [URL] {
         let doc = try open(url)
+        let base = url.deletingPathExtension().lastPathComponent
+        if let pages, pages.count == 1 {
+            let single = PDFDocument()
+            if let page = doc.page(at: pages[0])?.copy() as? PDFPage { single.insert(page, at: 0) }
+            let dest = Output.beside(url, ext: "pdf", suffix: " – page \(pages[0] + 1)")
+            guard single.write(to: dest) else { throw ToolError("Could not write page \(pages[0] + 1).") }
+            return [dest]
+        }
         let folder = Output.beside(url, ext: "", suffix: " pages")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let base = url.deletingPathExtension().lastPathComponent
-        for i in 0..<doc.pageCount {
+        for i in pages ?? Array(0..<doc.pageCount) {
             let single = PDFDocument()
             if let page = doc.page(at: i)?.copy() as? PDFPage { single.insert(page, at: 0) }
             let dest = folder.appendingPathComponent("\(base) – page \(i + 1).pdf")
@@ -49,16 +57,36 @@ enum PDFTools {
         return [folder]
     }
 
-    /// Renders each page to an image at 2x (144 dpi).
-    static func toImages(_ url: URL, format: OutputFormat = .png, scale: CGFloat = 2) throws -> [URL] {
+    /// Saves the chosen pages (0-based, in the order given) as one PDF, one PDF per page, or images.
+    static func extract(_ url: URL, pages: [Int], as output: PageOutput) throws -> [URL] {
+        let doc = try open(url)
+        let pages = pages.filter { $0 >= 0 && $0 < doc.pageCount }
+        guard !pages.isEmpty else { throw ToolError("No pages were selected.") }
+        switch output {
+        case .png, .jpg: return try toImages(url, format: output == .png ? .png : .jpg, pages: pages)
+        case .pdf:
+            let out = PDFDocument()
+            for i in pages { if let page = doc.page(at: i)?.copy() as? PDFPage { out.insert(page, at: out.pageCount) } }
+            let label = pages.count == 1 ? "page" : "pages"
+            let dest = Output.beside(url, ext: "pdf", suffix: " – \(label) \(PageRange.describe(pages))")
+            guard out.write(to: dest) else { throw ToolError("PDFKit could not write the extracted pages.") }
+            return [dest]
+        case .pdfs:
+            return try split(url, pages: pages)
+        }
+    }
+
+    /// Renders pages (all by default) to images at 2x (144 dpi).
+    static func toImages(_ url: URL, format: OutputFormat = .png, scale: CGFloat = 2, pages: [Int]? = nil) throws -> [URL] {
         let doc = try open(url)
         let base = url.deletingPathExtension().lastPathComponent
-        let single = doc.pageCount == 1
+        let indices = pages ?? Array(0..<doc.pageCount)
+        let single = indices.count == 1
         let folder = single ? url.deletingLastPathComponent() : Output.beside(url, ext: "", suffix: " \(format.label)")
         if !single { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
 
         var results: [URL] = []
-        for i in 0..<doc.pageCount {
+        for i in indices {
             guard let page = doc.page(at: i) else { continue }
             let bounds = page.bounds(for: .mediaBox)
             let w = Int(bounds.width * scale), h = Int(bounds.height * scale)
@@ -74,7 +102,7 @@ enum PDFTools {
             page.draw(with: .mediaBox, to: ctx)
             guard let img = ctx.makeImage() else { throw ToolError("Could not render PDF page \(i + 1).") }
 
-            let dest = single ? Output.beside(url, ext: format.rawValue)
+            let dest = single ? Output.beside(url, ext: format.rawValue, suffix: doc.pageCount == 1 ? "" : " – page \(i + 1)")
                               : folder.appendingPathComponent("\(base) – page \(i + 1).\(format.rawValue)")
             guard let out = CGImageDestinationCreateWithURL(dest as CFURL, format.utType!.identifier as CFString, 1, nil) else {
                 throw ToolError("Could not save the PDF page image.")
@@ -108,5 +136,54 @@ enum PDFTools {
         let dest = Output.beside(url, ext: "pdf", suffix: " clean")
         guard doc.write(to: dest) else { throw ToolError("PDFKit could not write the cleaned PDF.") }
         return dest
+    }
+}
+
+/// What to save the pages picked from a PDF as.
+enum PageOutput: String, CaseIterable, Identifiable {
+    case pdf, pdfs, png, jpg
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .pdf: return "One PDF"
+        case .pdfs: return "PDF per Page"
+        case .png: return "PNG Images"
+        case .jpg: return "JPEG Images"
+        }
+    }
+}
+
+/// Page lists written the way people type them: "1-3, 5, 8-" (1-based, inclusive; open ends allowed).
+enum PageRange {
+    /// 0-based page indices in the order written, without duplicates; nil if the text is malformed or out of range.
+    static func parse(_ text: String, pageCount: Int) -> [Int]? {
+        var result: [Int] = [], seen = Set<Int>()
+        let parts = text.split(whereSeparator: { $0 == "," || $0 == ";" })
+        for raw in parts {
+            let part = raw.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "–", with: "-")
+            guard !part.isEmpty else { continue }
+            let bounds = part.split(separator: "-", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+            let lo: Int?, hi: Int?
+            switch bounds.count {
+            case 1: lo = Int(bounds[0]); hi = lo
+            case 2: lo = bounds[0].isEmpty ? 1 : Int(bounds[0]); hi = bounds[1].isEmpty ? pageCount : Int(bounds[1])
+            default: return nil
+            }
+            guard let lo, let hi, lo >= 1, hi <= pageCount, lo <= hi else { return nil }
+            for p in lo...hi where seen.insert(p - 1).inserted { result.append(p - 1) }
+        }
+        return result
+    }
+
+    /// "1–3, 5" for 0-based indices [0, 1, 2, 4].
+    static func describe(_ pages: [Int]) -> String {
+        var runs: [String] = [], i = 0
+        while i < pages.count {
+            var j = i
+            while j + 1 < pages.count, pages[j + 1] == pages[j] + 1 { j += 1 }
+            runs.append(j > i ? "\(pages[i] + 1)–\(pages[j] + 1)" : "\(pages[i] + 1)")
+            i = j + 1
+        }
+        return runs.joined(separator: ", ")
     }
 }

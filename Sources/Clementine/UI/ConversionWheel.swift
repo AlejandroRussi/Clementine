@@ -83,13 +83,14 @@ final class ConversionWheel {
 // MARK: - Views
 
 private final class WheelView: NSView {
-    private let count: Int
-
     init(frame: NSRect, count: Int, conversions: [FileOperation], tools: [FileOperation],
          action: @escaping (FileOperation, [URL]) -> Void) {
-        self.count = count
         super.init(frame: frame)
         let center = NSPoint(x: frame.midX, y: frame.midY)
+        let disc = GlassSurface.backdrop(cornerRadius: 228, tint: NSColor.windowBackgroundColor.withAlphaComponent(0.25))
+        disc.frame = NSRect(x: center.x - 228, y: center.y - 228, width: 456, height: 456)
+        addSubview(disc)
+        addSubview(HubView(frame: NSRect(x: center.x - 44, y: center.y - 44, width: 88, height: 88), count: count))
         place(conversions, radius: 100, around: center, accent: true, action: action)
         place(tools, radius: 185, around: center, accent: false, action: action)
     }
@@ -108,25 +109,31 @@ private final class WheelView: NSView {
             addSubview(target)
         }
     }
+}
+
+/// The orange center disc showing how many files are in play.
+private final class HubView: NSView {
+    private let count: Int
+
+    init(frame: NSRect, count: Int) {
+        self.count = count
+        super.init(frame: frame)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ dirtyRect: NSRect) {
-        let c = NSPoint(x: bounds.midX, y: bounds.midY)
-        // Backdrop disc
-        let disc = NSBezierPath(ovalIn: NSRect(x: c.x - 228, y: c.y - 228, width: 456, height: 456))
-        NSColor.windowBackgroundColor.withAlphaComponent(0.88).setFill()
-        disc.fill()
-        NSColor.separatorColor.setStroke()
-        disc.stroke()
-        // Center hub
-        let hub = NSBezierPath(ovalIn: NSRect(x: c.x - 44, y: c.y - 44, width: 88, height: 88))
-        NSColor.systemOrange.setFill()
-        hub.fill()
+        let hub = NSBezierPath(ovalIn: bounds.insetBy(dx: 0.5, dy: 0.5))
+        NSGradient(starting: .systemOrange.blended(withFraction: 0.25, of: .white) ?? .systemOrange,
+                   ending: .systemOrange)?.draw(in: hub, angle: -90)
+        NSColor.white.withAlphaComponent(0.45).setStroke()
+        hub.stroke()
         let text = "\(count)\n\(count == 1 ? "file" : "files")" as NSString
         let para = NSMutableParagraphStyle(); para.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 15, weight: .bold),
                                                     .foregroundColor: NSColor.white, .paragraphStyle: para]
-        let size = text.boundingRect(with: NSSize(width: 88, height: 88), options: .usesLineFragmentOrigin, attributes: attrs).size
-        text.draw(in: NSRect(x: c.x - 44, y: c.y - size.height / 2, width: 88, height: size.height), withAttributes: attrs)
+        let size = text.boundingRect(with: bounds.size, options: .usesLineFragmentOrigin, attributes: attrs).size
+        text.draw(in: NSRect(x: 0, y: bounds.midY - size.height / 2, width: bounds.width, height: size.height), withAttributes: attrs)
     }
 }
 
@@ -148,14 +155,16 @@ private final class WheelTargetView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ dirtyRect: NSRect) {
+        // Translucent bubble with a bright rim, so the glass disc shows through.
         let circle = NSBezierPath(ovalIn: bounds.insetBy(dx: 1, dy: 1))
-        let base: NSColor = accent ? .systemOrange.withAlphaComponent(0.18) : .controlBackgroundColor
-        (highlighted ? NSColor.systemOrange : base).setFill()
+        let hot: NSColor = op.isDestructive ? .systemRed : .systemOrange
+        let base: NSColor = accent ? .systemOrange.withAlphaComponent(0.22) : NSColor.labelColor.withAlphaComponent(0.06)
+        (highlighted ? hot : base).setFill()
         circle.fill()
-        NSColor.separatorColor.setStroke()
-        circle.stroke()
+        NSGradient(starting: NSColor.white.withAlphaComponent(highlighted ? 0.6 : 0.5),
+                   ending: NSColor.white.withAlphaComponent(0.08))?.draw(in: rim(), angle: -90)
 
-        let fg: NSColor = highlighted ? .white : .labelColor
+        let fg: NSColor = highlighted ? .white : (op.isDestructive ? .systemRed : .labelColor)
         let para = NSMutableParagraphStyle(); para.alignment = .center
         if case .convert(let f) = op {
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .bold),
@@ -171,6 +180,13 @@ private final class WheelTargetView: NSView {
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .medium),
                                                     .foregroundColor: fg, .paragraphStyle: para]
         (op.title as NSString).draw(in: NSRect(x: 2, y: bounds.midY - 18, width: bounds.width - 4, height: 13), withAttributes: attrs)
+    }
+
+    /// A 1pt ring path, filled with a gradient to fake a lit glass edge.
+    private func rim() -> NSBezierPath {
+        let ring = NSBezierPath(ovalIn: bounds.insetBy(dx: 0.5, dy: 0.5))
+        ring.append(NSBezierPath(ovalIn: bounds.insetBy(dx: 1.5, dy: 1.5)).reversed)
+        return ring
     }
 
     // Drop handling

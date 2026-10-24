@@ -79,6 +79,7 @@ enum FileOperation: Hashable {
     case readQRCode
     case combinePDF           // images/PDFs -> one PDF
     case splitPDF             // PDF -> one PDF per page
+    case pickPages            // chosen pages of one PDF -> PDF(s) or images
     case pdfToImages
     case videoToGIF
     case extractAudio
@@ -102,6 +103,7 @@ enum FileOperation: Hashable {
     case addToFloat
     case airDrop
     case copyPaths
+    case shred                // hide now, Undo for 30 s, then overwrite + delete
 
     var title: String {
         switch self {
@@ -113,6 +115,7 @@ enum FileOperation: Hashable {
         case .readQRCode: return "Read QR"
         case .combinePDF: return "Combine PDF"
         case .splitPDF: return "Split PDF"
+        case .pickPages: return "Pick Pages"
         case .pdfToImages: return "PDF → PNG"
         case .videoToGIF: return "Make GIF"
         case .extractAudio: return "Extract Audio"
@@ -134,6 +137,7 @@ enum FileOperation: Hashable {
         case .addToFloat: return "Float"
         case .airDrop: return "AirDrop"
         case .copyPaths: return "Copy Paths"
+        case .shred: return "Shred"
         }
     }
 
@@ -147,6 +151,7 @@ enum FileOperation: Hashable {
         case .readQRCode: return "qrcode.viewfinder"
         case .combinePDF: return "doc.on.doc"
         case .splitPDF: return "scissors"
+        case .pickPages: return "square.grid.3x3.topleft.filled"
         case .pdfToImages: return "photo.on.rectangle"
         case .videoToGIF: return "film.stack"
         case .extractAudio: return "waveform"
@@ -168,8 +173,12 @@ enum FileOperation: Hashable {
         case .addToFloat: return "rectangle.stack"
         case .airDrop: return "dot.radiowaves.left.and.right"
         case .copyPaths: return "link"
+        case .shred: return "flame"
         }
     }
+
+    /// Destroys the input files (drawn in red in the wheel).
+    var isDestructive: Bool { self == .shred }
 }
 
 enum OperationCatalog {
@@ -216,7 +225,7 @@ enum OperationCatalog {
             ops.append(.extractText)
             if urls.count > 1 || only(.image) { ops.append(.combinePDF) }
         }
-        if only(.pdf) { ops += [.splitPDF, .pdfToImages] }
+        if only(.pdf) { ops += (urls.count == 1 ? [.pickPages] : []) + [.splitPDF, .pdfToImages] }
         if only(.video) {
             if urls.count == 1 { ops += [.trim, .split, .changeSpeed, .crop] } else { ops.append(.join) }
             ops += [.videoToGIF, .extractAudio, .muteVideo]
@@ -226,7 +235,7 @@ enum OperationCatalog {
             ops += [.normalizeAudio, .trimSilence]
         }
         if only(.archive) { ops.append(.extractArchive) } else { ops.append(.zip) }
-        ops += [.addToFloat, .airDrop, .copyPaths]
+        ops += [.addToFloat, .airDrop, .copyPaths, .shred]
         return ops
     }
 }

@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = MenuBarController()
+        Shredder.shared.sweepLeftovers()
 
         monitor.onTrigger = { urls, point in
             ConversionWheel.shared.show(for: urls, at: point)
@@ -36,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let ops: [String: FileOperation] = ["trim": .trim, "split": .split, "speed": .changeSpeed, "crop": .crop,
                                                 "normalize": .normalizeAudio, "channels": .audioChannels, "join": .join,
                                                 "annotate": .annotate, "redact": .redact, "background": .background,
-                                                "collage": .collage]
+                                                "collage": .collage, "pages": .pickPages]
             if let op = ops[args[i + 1]] { OperationRunner.shared.run(op, on: Array(urls)) }
             if let path = ProcessInfo.processInfo.environment["CLEMENTINE_SNAPSHOT"] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -49,5 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if !Settings.shared.hasSeenWelcome {
             Windows.showWelcome()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Quitting ends the undo window early: erase what's pending rather than leave it in a temp folder.
+        Shredder.shared.finalizeAll()
     }
 }

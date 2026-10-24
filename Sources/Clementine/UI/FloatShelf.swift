@@ -56,7 +56,10 @@ final class FloatController: NSObject, NSWindowDelegate {
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.isReleasedWhenClosed = false
         p.delegate = self
-        p.contentView = NSHostingView(rootView: FloatView(model: model, onClose: { [weak self] in self?.close() }))
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        let host = NSHostingView(rootView: FloatView(model: model, onClose: { [weak self] in self?.close() }))
+        p.contentView = GlassSurface.backdrop(cornerRadius: 16, content: host)
         if let f = NSScreen.main?.visibleFrame {
             p.setFrameOrigin(NSPoint(x: f.maxX - 260, y: f.midY - 160))
         }
@@ -145,6 +148,12 @@ private struct FloatView: View {
         }
         Divider()
         Button("Remove from Float") { model.remove(urls) }
+        Button("Shred", role: .destructive) {
+            Task { @MainActor in
+                model.remove(urls)
+                Shredder.shared.shred(urls)
+            }
+        }
     }
 }
 
@@ -161,7 +170,7 @@ private struct FloatRow: View {
             Spacer(minLength: 0)
         }
         .padding(6)
-        .background(selected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+        .background(selected ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
     }
     private var sizeText: String {

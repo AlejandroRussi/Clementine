@@ -12,9 +12,11 @@ final class OperationRunner {
         case .addToFloat: FloatController.shared.add(urls); return
         case .airDrop: share(urls); return
         case .copyPaths: copyPaths(urls); return
+        case .shred: Shredder.shared.shred(urls); return
         case .readQRCode: readQR(urls); return
         case .join: MediaEditorController.openJoin(urls); return
         case .collage: MediaEditorController.openCollage(urls); return
+        case .pickPages: MediaEditorController.openPDFPages(urls[0]); return
         case .annotate, .redact, .background: MediaEditorController.openImage(urls, tool: op); return
         case .crop where FileKind.of(urls[0]) == .image: MediaEditorController.openImage(urls, tool: op); return
         case .trim, .split, .changeSpeed, .crop, .audioChannels:

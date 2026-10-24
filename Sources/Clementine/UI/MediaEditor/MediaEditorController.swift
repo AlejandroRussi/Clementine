@@ -33,6 +33,12 @@ enum MediaEditorController {
                 title: "Join \(urls.count) Videos", size: NSSize(width: 520, height: 460)) {}
     }
 
+    static func openPDFPages(_ url: URL) {
+        let model = PDFPagesModel(url: url)
+        present(NSHostingController(rootView: PDFPagesView(model: model)),
+                title: "Pick Pages – \(url.lastPathComponent)", size: NSSize(width: 820, height: 640)) {}
+    }
+
     private static func present(_ controller: NSViewController, title: String, size: NSSize, onClose: @escaping () -> Void) {
         let window = NSWindow(contentViewController: controller)
         window.title = title

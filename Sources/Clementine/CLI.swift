@@ -6,7 +6,8 @@ import Foundation
 ///   trim:<start>-<end>, cut:<t1>,<t2>[:joined:<removed idx>,...], join, speed:<x>, crop:<x>,<y>,<w>,<h>,
 ///   normalize[:<lufs>[:<ceiling dB>]], channels:<mono|stereo>[:<left>,<right>], silence[:<dB>], loudness,
 ///   annotate:<marks.json>, redact:<x>,<y>,<w>,<h>[;…][:blur|pixelate|solid], redact-auto[:style],
-///   background[:<preset 0-5|blurred|#rrggbb>[:<padding>[:<ratio>[:lift]]]], collage[:<columns>[:fill|fit]]
+///   background[:<preset 0-5|blurred|#rrggbb>[:<padding>[:<ratio>[:lift]]]], collage[:<columns>[:fill|fit]],
+///   pages:<1-3,5,8->[:pdf|pdfs|png|jpg], shred (immediate, no undo)
 /// Image rects for crop/redact are normalized 0…1 with a top-left origin.
 enum CLI {
     static func operation(_ name: String) -> FileOperation? {
@@ -99,6 +100,18 @@ enum CLI {
             let v = nums(2, ",")
             return [try AudioEdit.convertChannels(url, layout: layout, leftVolume: v.first ?? 1, rightVolume: v.count > 1 ? v[1] : 1)]
         case "silence": return try urls.map { try AudioEdit.trimSilence($0, thresholdDB: nums(1, ",").first ?? -50) }
+        case "pages":
+            guard parts.count > 1 else { throw ToolError("pages:<1-3,5,8->[:pdf|pdfs|png|jpg]") }
+            let count = try PDFTools.open(url).pageCount
+            guard let pages = PageRange.parse(parts[1], pageCount: count), !pages.isEmpty else {
+                throw ToolError("Pages must be within 1–\(count), like 1-3,5,8-")
+            }
+            let output = parts.count > 2 ? PageOutput(rawValue: parts[2]) ?? .pdf : .pdf
+            return try PDFTools.extract(url, pages: pages.sorted(), as: output)
+        case "shred":
+            let failures = Shredder.erase(urls)
+            if !failures.isEmpty { throw ToolError(failures.joined(separator: "\n")) }
+            return []
         case "loudness":
             for u in urls {
                 let m = try AudioEdit.measure(u)

@@ -5,6 +5,9 @@ final class HUDModel: ObservableObject {
     @Published var title: String
     @Published var detail = ""
     @Published var done = false
+    /// Seconds left on an undo offer; nil for ordinary progress HUDs.
+    @Published var undoRemaining: Int?
+    var onUndo: (() -> Void)?
     init(title: String) { self.title = title }
 }
 
@@ -12,7 +15,9 @@ private struct HUDView: View {
     @ObservedObject var model: HUDModel
     var body: some View {
         HStack(spacing: 12) {
-            if model.done {
+            if model.undoRemaining != nil {
+                Image(systemName: "flame.fill").font(.title2).foregroundStyle(.red)
+            } else if model.done {
                 Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.orange)
             } else {
                 ProgressView().controlSize(.small)
@@ -24,10 +29,16 @@ private struct HUDView: View {
                 }
             }
             Spacer(minLength: 0)
+            if let remaining = model.undoRemaining {
+                Button { model.onUndo?() } label: {
+                    Text("Undo ⌘Z · \(remaining)s").monospacedDigit()
+                }
+                .controlSize(.small)
+            }
         }
         .padding(14)
-        .frame(width: 300)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .frame(width: 320)
+        .clearGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -47,18 +58,36 @@ final class ProgressHUD {
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: HUDView(model: model))
+        panel.contentView = NSHostingView(rootView: HUDView(model: model))
+        resize()
+        panel.orderFrontRegardless()
+    }
+
+    private func resize() {
+        guard let host = panel.contentView else { return }
         host.frame.size = host.fittingSize
-        panel.contentView = host
         panel.setContentSize(host.fittingSize)
         if let screen = NSScreen.main {
             let f = screen.visibleFrame
             panel.setFrameTopLeftPoint(NSPoint(x: f.maxX - panel.frame.width - 16, y: f.maxY - 12))
         }
-        panel.orderFrontRegardless()
     }
 
     static func show(title: String) -> ProgressHUD { ProgressHUD(title: title) }
+
+    /// A clickable HUD that counts down `seconds`, offering Undo until it expires.
+    static func offerUndo(_ message: String, detail: String, seconds: Int, onUndo: @escaping () -> Void) -> ProgressHUD {
+        let hud = ProgressHUD(title: message)
+        hud.panel.ignoresMouseEvents = false
+        hud.model.detail = detail
+        hud.model.undoRemaining = seconds
+        hud.model.onUndo = onUndo
+        hud.resize()
+        return hud
+    }
+
+    /// Updates the countdown shown on an undo HUD.
+    func setUndoRemaining(_ seconds: Int) { model.undoRemaining = seconds }
 
     static func flash(_ message: String) {
         let hud = ProgressHUD(title: message)
@@ -71,6 +100,8 @@ final class ProgressHUD {
         model.title = message
         model.detail = ""
         model.done = true
+        model.undoRemaining = nil
+        panel.ignoresMouseEvents = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.close() }
     }
 
